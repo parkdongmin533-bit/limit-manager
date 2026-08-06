@@ -424,6 +424,21 @@
       <button class="btn btn-primary" style="margin-top:0;" id="addProductBtn">등록</button>
     </div>
 
+    <div class="bulk-import">
+      <div class="bulk-import-head" id="bulkProductToggle">
+        <span class="inst-chevron" id="bulkProductChevron">▶</span>
+        <b>엑셀에서 한 번에 상품 등록</b>
+      </div>
+      <div class="bulk-import-body" id="bulkProductBody">
+        <p class="modal-sub" style="margin:0 0 8px;">
+          엑셀에서 <b>상품사, 상품명, 만기구분, 만기일, 총한도</b> 순서로 5개 칸을 같이 선택해서 복사 → 아래 붙여넣기.<br>
+          만기일은 비워도 됩니다(형식: 2027-06-30). 한 줄에 상품 하나씩.
+        </p>
+        <textarea id="bulkProductText" rows="6" placeholder="삼성생명&#9;GA-1형&#9;1년&#9;2027-06-30&#9;1000&#10;교보생명&#9;확정형A&#9;3년&#9;&#9;500"></textarea>
+        <button class="btn btn-primary" style="width:auto; margin-top:10px;" id="bulkProductAddBtn">일괄 등록</button>
+      </div>
+    </div>
+
     <div class="section-title"><h2>상품 관리</h2></div>
     <table id="productMgmtTable" style="margin-bottom:8px;">
       <thead>
@@ -912,6 +927,45 @@ function renderRmMgmt() {
 }
 
 // ---------- 관리자: 전체 내역 / 상품 등록 ----------
+document.getElementById('bulkProductToggle').onclick = () => {
+  const body = document.getElementById('bulkProductBody');
+  const open = body.classList.toggle('open');
+  document.getElementById('bulkProductChevron').classList.toggle('open', open);
+};
+
+document.getElementById('bulkProductAddBtn').onclick = async () => {
+  const raw = document.getElementById('bulkProductText').value;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) { alert('붙여넣은 내용이 없습니다.'); return; }
+
+  const rows = lines.map(line => {
+    const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
+    const [provider, name, tenor, maturity, limit] = parts.map(s => (s || '').trim());
+    return {
+      provider: provider || '',
+      name: name || '',
+      tenor: tenor || null,
+      maturity: /^\d{4}-\d{2}-\d{2}$/.test(maturity) ? maturity : null,
+      limit: Number(limit)
+    };
+  }).filter(r => r.provider && r.name && r.limit > 0);
+
+  if (rows.length === 0) { alert('형식을 인식하지 못했습니다. "상품사, 상품명, 만기구분, 만기일, 총한도" 순서를 확인해주세요.'); return; }
+
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    const { error } = await supabase.rpc('add_product', {
+      p_provider: r.provider, p_name: r.name, p_maturity: r.maturity,
+      p_total_limit: r.limit, p_tenor_label: r.tenor
+    });
+    if (error) fail++; else ok++;
+  }
+
+  document.getElementById('bulkProductText').value = '';
+  await loadData();
+  alert(`${ok}건 등록 완료.` + (fail > 0 ? `\n${fail}건 실패` : ''));
+};
+
 document.getElementById('addProductBtn').onclick = async () => {
   const provider = document.getElementById('apProvider').value.trim();
   const name = document.getElementById('apName').value.trim();
@@ -1043,6 +1097,13 @@ function renderAllAllocations() {
       cancelBtn.onclick = () => cancelAlloc(a.id);
       tr.querySelector('.row-actions').append(cancelBtn);
     }
+    if (a.status === 'confirmed') {
+      const revertBtn = document.createElement('button');
+      revertBtn.className = 'btn btn-sm btn-danger';
+      revertBtn.textContent = '확정취소';
+      revertBtn.onclick = () => adminCancelConfirmed(a);
+      tr.querySelector('.row-actions').append(revertBtn);
+    }
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-sm btn-danger';
     delBtn.textContent = '삭제';
@@ -1050,6 +1111,13 @@ function renderAllAllocations() {
     tr.querySelector('.row-actions').append(delBtn);
     tbody.appendChild(tr);
   });
+}
+
+async function adminCancelConfirmed(a) {
+  if (!confirm(`[확정] ${a.rm_name} · ${a.corp_name} · ${fmt(a.amount)}억\n확정을 취소하시겠습니까?\n한도는 즉시 복구되고, 기록은 "취소" 상태로 남습니다(삭제 아님).`)) return;
+  const { error } = await supabase.rpc('admin_cancel_allocation', { p_id: a.id });
+  if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
+  await loadData();
 }
 
 async function adminDeleteAlloc(a) {
