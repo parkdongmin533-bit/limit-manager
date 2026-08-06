@@ -209,6 +209,26 @@
   }
   .danger-zone b{color:var(--danger);}
 
+  /* ---------- 전체 상품 현황판 ---------- */
+  .board-section{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px; margin-bottom:32px;
+  }
+  .board-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;}
+  .board-head h2{font-size:15px; margin:0;}
+  .board-asof{font-family:var(--mono); font-size:12px; color:var(--ink-soft);}
+  .board-summary{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+  .board-sum-card{
+    flex:1; min-width:130px; background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    padding:10px 14px;
+  }
+  .board-sum-card .label{font-size:11px; color:var(--ink-soft); font-family:var(--mono);}
+  .board-sum-card .val{font-family:var(--mono); font-size:17px; font-weight:700; margin-top:2px;}
+  .board-sum-card.grand{background:var(--ink); color:#fff;}
+  .board-sum-card.grand .label{color:#9aa2af;}
+  #boardTable td, #boardTable th{white-space:nowrap;}
+  #boardTable td.note-cell{white-space:normal; max-width:220px; font-size:12px; color:var(--ink-soft);}
+
   /* ---------- CSV 내보내기 ---------- */
   .export-row{display:flex; gap:10px; margin-bottom:16px;}
 
@@ -381,6 +401,27 @@
 
 <main>
 
+  <div class="board-section">
+    <div class="board-head">
+      <h2>📋 전체 상품 현황판</h2>
+      <span class="board-asof" id="boardAsOf"></span>
+    </div>
+    <div id="boardSummary" class="board-summary"></div>
+    <div class="table-scroll" style="max-height:420px;">
+      <table id="boardTable">
+        <thead>
+          <tr>
+            <th>업권</th><th>기관명</th><th>신용등급</th>
+            <th>1년</th><th>2년</th><th>3년</th><th>5년</th><th>기타금리</th>
+            <th>1년한도</th><th>1.5년</th><th>2년한도</th><th>3년한도</th><th>5년한도</th><th>합계</th>
+            <th>비고</th>
+          </tr>
+        </thead>
+        <tbody id="boardTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="section-title">
     <h2>기관별 실시간 잔액</h2>
     <span class="count" id="productCount">0</span>
@@ -403,6 +444,27 @@
   </table>
 
   <div id="adminSection" style="display:none;">
+    <div class="section-title"><h2>📋 전체 상품 현황판 갱신</h2></div>
+    <div class="bulk-import" style="margin-bottom:20px;">
+      <div class="bulk-import-head" id="boardToggle">
+        <span class="inst-chevron" id="boardChevron">▶</span>
+        <b>엑셀에서 통째로 붙여넣기 (기존 게시판 전체 교체)</b>
+      </div>
+      <div class="bulk-import-body" id="boardBody">
+        <p class="modal-sub" style="margin:0 0 8px;">
+          열 순서: <b>업권, 기관명, 신용등급, 1년금리, 2년금리, 3년금리, 5년금리, 기타금리, 1년한도, 1.5년한도, 2년한도, 3년한도, 5년한도, 비고</b> (14열)<br>
+          엑셀 병합셀 때문에 "업권"이 중간에 비어 나오면 바로 위 행 값을 자동으로 이어받습니다. 숫자 칸은 비워도 됩니다.<br>
+          ⚠ 등록 버튼을 누르면 기존 현황판 내용은 <b>전부 교체</b>됩니다 (실시간 잔액 추적 데이터와는 무관, 이 게시판만 바뀜).
+        </p>
+        <div class="field" style="max-width:220px; margin-bottom:10px;">
+          <label>기준일</label>
+          <input id="boardAsOfInput" type="date">
+        </div>
+        <textarea id="boardText" rows="8" placeholder="증권&#9;NH&#9;AA+&#9;3.2&#9;3.3&#9;3.4&#9;&#9;1.5년 3.46&#9;1500&#9;100&#9;&#9;700&#9;&#9;1년 1500억 1.5년 100억, 3년 700억"></textarea>
+        <button class="btn btn-primary" style="width:auto; margin-top:10px;" id="boardReplaceBtn">게시판 전체 교체</button>
+      </div>
+    </div>
+
     <div class="section-title">
       <h2>RM 명단 관리</h2>
       <span class="count" id="rmCount">0</span>
@@ -605,6 +667,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let products = [];
 let allocations = [];
 let rmRoster = [];
+let boardRows = [];
 let isAdmin = false;
 let selectedProductId = null;
 
@@ -645,18 +708,22 @@ setInterval(() => {
 
 // ---------- 데이터 로드 ----------
 async function loadData() {
-  const [{ data: p, error: pe }, { data: a, error: ae }, { data: r, error: re }] = await Promise.all([
+  const [{ data: p, error: pe }, { data: a, error: ae }, { data: r, error: re }, { data: b, error: be }] = await Promise.all([
     supabase.from('products').select('*').order('created_at'),
     supabase.from('allocations').select('*').order('created_at', { ascending:false }),
-    supabase.from('rm_roster').select('*').order('center').order('name')
+    supabase.from('rm_roster').select('*').order('center').order('name'),
+    supabase.from('institution_board').select('*').order('sector').order('institution')
   ]);
   if (pe) console.error(pe);
   if (ae) console.error(ae);
   if (re) console.error(re);
+  if (be) console.error(be);
   products = p || [];
   allocations = a || [];
   rmRoster = r || [];
+  boardRows = b || [];
   renderRmSelect();
+  renderBoard();
   render();
 }
 
@@ -671,6 +738,107 @@ function balanceFor(productId) {
     .reduce((s,a) => s + Number(a.amount), 0);
   return { confirmed, hold };
 }
+
+// ---------- 렌더: 전체 상품 현황판 ----------
+function boardRowTotal(r) {
+  return ['limit_1y','limit_1_5y','limit_2y','limit_3y','limit_5y']
+    .reduce((s, k) => s + (Number(r[k]) || 0), 0);
+}
+
+function renderBoard() {
+  const asOfEl = document.getElementById('boardAsOf');
+  const summaryEl = document.getElementById('boardSummary');
+  const tbody = document.getElementById('boardTbody');
+
+  if (boardRows.length === 0) {
+    asOfEl.textContent = '';
+    summaryEl.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="15" style="color:#9aa0a6;">아직 등록된 현황판이 없습니다. 관리자 모드에서 엑셀 붙여넣기로 등록해주세요.</td></tr>';
+    return;
+  }
+
+  const asOf = boardRows.find(r => r.as_of_date)?.as_of_date;
+  asOfEl.textContent = asOf ? `${asOf} 기준` : '';
+
+  const bySector = new Map();
+  let grand = 0;
+  boardRows.forEach(r => {
+    const t = boardRowTotal(r);
+    grand += t;
+    const key = r.sector || '미분류';
+    bySector.set(key, (bySector.get(key) || 0) + t);
+  });
+  let cards = '';
+  bySector.forEach((sum, sector) => {
+    cards += `<div class="board-sum-card"><div class="label">${escapeHtml(sector)} 계</div><div class="val">${fmt(sum)}억</div></div>`;
+  });
+  cards += `<div class="board-sum-card grand"><div class="label">전체 합계</div><div class="val">${fmt(grand)}억</div></div>`;
+  summaryEl.innerHTML = cards;
+
+  tbody.innerHTML = boardRows.map(r => `
+    <tr>
+      <td>${r.sector ? escapeHtml(r.sector) : '—'}</td>
+      <td><b>${escapeHtml(r.institution)}</b></td>
+      <td>${r.credit_rating ? escapeHtml(r.credit_rating) : '—'}</td>
+      <td>${r.rate_1y ?? '—'}</td>
+      <td>${r.rate_2y ?? '—'}</td>
+      <td>${r.rate_3y ?? '—'}</td>
+      <td>${r.rate_5y ?? '—'}</td>
+      <td>${r.rate_other ? escapeHtml(r.rate_other) : '—'}</td>
+      <td class="amount">${r.limit_1y ? fmt(r.limit_1y) : '—'}</td>
+      <td class="amount">${r.limit_1_5y ? fmt(r.limit_1_5y) : '—'}</td>
+      <td class="amount">${r.limit_2y ? fmt(r.limit_2y) : '—'}</td>
+      <td class="amount">${r.limit_3y ? fmt(r.limit_3y) : '—'}</td>
+      <td class="amount">${r.limit_5y ? fmt(r.limit_5y) : '—'}</td>
+      <td class="amount"><b>${fmt(boardRowTotal(r))}</b></td>
+      <td class="note-cell">${r.note ? escapeHtml(r.note) : ''}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('boardToggle').onclick = () => {
+  const body = document.getElementById('boardBody');
+  const open = body.classList.toggle('open');
+  document.getElementById('boardChevron').classList.toggle('open', open);
+};
+
+document.getElementById('boardReplaceBtn').onclick = async () => {
+  const btn = document.getElementById('boardReplaceBtn');
+  if (btn.disabled) return;
+  const asOf = document.getElementById('boardAsOfInput').value || null;
+  const raw = document.getElementById('boardText').value;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) { alert('붙여넣은 내용이 없습니다.'); return; }
+
+  const num = v => { const n = Number((v || '').replace(/,/g, '')); return v && !isNaN(n) ? n : null; };
+  let lastSector = null;
+  const rows = lines.map(line => {
+    const c = line.split('\t');
+    let sector = (c[0] || '').trim();
+    if (sector) lastSector = sector; else sector = lastSector;
+    return {
+      sector: sector || null,
+      institution: (c[1] || '').trim(),
+      credit_rating: (c[2] || '').trim() || null,
+      rate_1y: num(c[3]), rate_2y: num(c[4]), rate_3y: num(c[5]), rate_5y: num(c[6]),
+      rate_other: (c[7] || '').trim() || null,
+      limit_1y: num(c[8]), limit_1_5y: num(c[9]), limit_2y: num(c[10]), limit_3y: num(c[11]), limit_5y: num(c[12]),
+      note: (c[13] || '').trim() || null
+    };
+  }).filter(r => r.institution);
+
+  if (rows.length === 0) { alert('기관명을 인식하지 못했습니다. 열 순서를 확인해주세요.'); return; }
+  if (!confirm(`기존 현황판을 지우고 ${rows.length}개 기관으로 전체 교체하시겠습니까?`)) return;
+
+  btn.disabled = true; btn.textContent = '갱신 중...';
+  const { error } = await supabase.rpc('admin_replace_board', { p_as_of_date: asOf, p_rows: rows });
+  btn.disabled = false; btn.textContent = '게시판 전체 교체';
+
+  if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
+  document.getElementById('boardText').value = '';
+  await loadData();
+  alert(`현황판이 ${rows.length}개 기관으로 갱신되었습니다.`);
+};
 
 // ---------- 렌더: 기관별 계층 카드 ----------
 let previousAvailable = {}; // for flash animation on realtime change
@@ -1126,11 +1294,21 @@ function renderProductMgmt() {
     return;
   }
 
+  // 중복 감지: 상품사+상품명+만기구분+만기일 조합이 2건 이상이면 표시
+  const dupCount = new Map();
+  products.forEach(p => {
+    const key = [p.provider, p.name, p.tenor_label || '', p.maturity || ''].join('|');
+    dupCount.set(key, (dupCount.get(key) || 0) + 1);
+  });
+
   rows.forEach(p => {
     const { confirmed, hold } = balanceFor(p.id);
+    const key = [p.provider, p.name, p.tenor_label || '', p.maturity || ''].join('|');
+    const isDup = dupCount.get(key) > 1;
     const tr = document.createElement('tr');
+    if (isDup) tr.style.background = 'var(--hold-dim)';
     tr.innerHTML = `
-      <td>${escapeHtml(p.provider)}</td>
+      <td>${escapeHtml(p.provider)} ${isDup ? '<span class="badge proposed" title="같은 상품사·상품명·만기구분·만기일 조합이 여러 건 있습니다">⚠ 중복</span>' : ''}</td>
       <td>${escapeHtml(p.name)}</td>
       <td>${p.tenor_label ? escapeHtml(p.tenor_label) : '—'}</td>
       <td>${p.maturity || '—'}</td>
@@ -1394,6 +1572,10 @@ supabase.channel('realtime-products')
 
 supabase.channel('realtime-rm-roster')
   .on('postgres_changes', { event:'*', schema:'public', table:'rm_roster' }, () => loadData())
+  .subscribe();
+
+supabase.channel('realtime-board')
+  .on('postgres_changes', { event:'*', schema:'public', table:'institution_board' }, () => loadData())
   .subscribe();
 
 function handleRealtimeAlloc(payload) {
