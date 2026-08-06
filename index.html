@@ -154,6 +154,9 @@
   .inst-header{
     display:flex; align-items:center; gap:16px; padding:16px 18px; cursor:pointer;
     user-select:none; touch-action:manipulation;
+    /* <button>으로 바꾸면서 기본 버튼 UA 스타일 초기화 */
+    width:100%; background:none; border:none; margin:0; font:inherit; color:inherit;
+    text-align:left; -webkit-appearance:none; appearance:none;
   }
   .inst-header:hover{ background:#FAFAF8; }
   /* 카카오톡 등 인앱 웹뷰에서 자식 요소별로 터치 인식이 들쭉날쭉한 버그 우회:
@@ -258,7 +261,9 @@
   }
   .bulk-import-head{
     display:flex; align-items:center; gap:8px; padding:13px 16px; cursor:pointer;
-    font-size:13px; user-select:none;
+    font-size:13px; user-select:none; touch-action:manipulation;
+    width:100%; background:none; border:none; margin:0; font-family:inherit; color:inherit;
+    text-align:left; -webkit-appearance:none; appearance:none;
   }
   .bulk-import-head:hover{background:#FAFAF8;}
   .bulk-import-body{display:none; padding:0 16px 16px;}
@@ -482,10 +487,10 @@
   <div id="adminSection" style="display:none;">
     <div class="section-title"><h2>📋 전체 상품 현황판 갱신</h2></div>
     <div class="bulk-import" style="margin-bottom:20px;">
-      <div class="bulk-import-head" id="boardToggle">
+      <button type="button" class="bulk-import-head" id="boardToggle">
         <span class="inst-chevron" id="boardChevron">▶</span>
         <b>엑셀에서 통째로 붙여넣기 (기존 게시판 전체 교체)</b>
-      </div>
+      </button>
       <div class="bulk-import-body" id="boardBody">
         <p class="modal-sub" style="margin:0 0 8px;">
           열 순서: <b>업권, 기관명, 신용등급, 1년금리, 2년금리, 3년금리, 5년금리, 기타금리, 1년한도, 1.5년한도, 2년한도, 3년한도, 5년한도, (합계), 비고</b><br>
@@ -513,10 +518,10 @@
     </div>
 
     <div class="bulk-import">
-      <div class="bulk-import-head" id="bulkToggle">
+      <button type="button" class="bulk-import-head" id="bulkToggle">
         <span class="inst-chevron" id="bulkChevron">▶</span>
         <b>엑셀에서 한 번에 붙여넣기 (60명 일괄 등록)</b>
-      </div>
+      </button>
       <div class="bulk-import-body" id="bulkBody">
         <p class="modal-sub" style="margin:0 0 8px;">
           엑셀에서 "이름" 칸과 "센터" 칸 두 개를 같이 선택해서 복사(Ctrl+C) → 아래에 붙여넣기(Ctrl+V).<br>
@@ -545,10 +550,10 @@
     </div>
 
     <div class="bulk-import">
-      <div class="bulk-import-head" id="bulkProductToggle">
+      <button type="button" class="bulk-import-head" id="bulkProductToggle">
         <span class="inst-chevron" id="bulkProductChevron">▶</span>
         <b>엑셀에서 한 번에 상품 등록</b>
-      </div>
+      </button>
       <div class="bulk-import-body" id="bulkProductBody">
         <p class="modal-sub" style="margin:0 0 8px;">
           엑셀에서 <b>상품사, 상품명, 만기구분, 만기일, 총한도</b> 순서로 5개 칸을 같이 선택해서 복사 → 아래 붙여넣기.<br>
@@ -564,10 +569,10 @@
       <span class="count" id="productMgmtCount">0</span>
     </div>
     <div class="inst-card" style="margin-bottom:16px;">
-      <div class="inst-header" id="productMgmtToggle" style="cursor:pointer;">
+      <button type="button" class="inst-header" id="productMgmtToggle">
         <span class="inst-chevron" id="productMgmtChevron">▶</span>
         <span style="font-size:13px; color:var(--ink-soft);">클릭해서 펼치기 / 접기 (목록이 길면 접어두세요)</span>
-      </div>
+      </button>
       <div class="inst-body" id="productMgmtBody">
         <input id="productMgmtFilter" placeholder="상품사·상품명·만기구분으로 검색" style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px; margin:14px 0 10px;">
         <div class="table-scroll">
@@ -999,7 +1004,7 @@ function renderProducts() {
     const instCard = document.createElement('div');
     instCard.className = 'inst-card';
     instCard.innerHTML = `
-      <div class="inst-header">
+      <button type="button" class="inst-header">
         <span class="inst-chevron ${isOpen?'open':''}">▶</span>
         <span class="inst-name">${escapeHtml(provider)}</span>
         <span class="inst-count">${list.length}개 만기구간</span>
@@ -1014,7 +1019,7 @@ function renderProducts() {
           <span>홀드 <b style="color:var(--hold)">${fmt(hold)}</b></span>
           <span class="avail ${available<=total*0.1?'warn':''}">잔액 ${fmt(available)}억</span>
         </div>
-      </div>
+      </button>
       <div class="inst-body ${isOpen?'open':''}">
         <div class="grid" id="grid-${cssId(provider)}"></div>
       </div>
