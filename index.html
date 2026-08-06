@@ -364,8 +364,12 @@
   .modal .field label{font-size:12px; color:var(--ink-soft); margin-bottom:6px; display:block;}
   .modal .field input, .modal .field select{
     width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:7px; font-size:14px;
-    font-family:var(--sans);
+    font-family:var(--sans); min-width:0; position:relative; z-index:1;
   }
+  /* 네이티브 숫자 증감 화살표 제거 — 좁은 칸에서 탭 영역을 예측 불가하게 방해하는 경우가 있음 */
+  .modal .field input[type="number"]{ -moz-appearance:textfield; }
+  .modal .field input[type="number"]::-webkit-outer-spin-button,
+  .modal .field input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   .modal .amount-hint{font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-top:5px;}
   .modal-actions{display:flex; gap:8px; margin-top:20px;}
   .modal-actions .btn{flex:1;}
@@ -665,9 +669,9 @@
     </div>
     <div class="field">
       <label>홀드 유지기간</label>
-      <div style="display:flex; gap:8px;">
-        <input id="mHoldValue" type="number" min="1" value="1" style="flex:1;">
-        <select id="mHoldUnit" style="flex:1;">
+      <div style="display:grid; grid-template-columns:90px 1fr; gap:8px;">
+        <input id="mHoldValue" type="number" min="1" value="1" style="width:100%; min-width:0;">
+        <select id="mHoldUnit" style="width:100%; min-width:0;">
           <option value="1">분</option>
           <option value="60" selected>시간</option>
           <option value="1440">일</option>
