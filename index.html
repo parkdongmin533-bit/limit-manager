@@ -107,6 +107,13 @@
   .card .provider{font-size:11px; color:var(--ink-soft); font-family:var(--mono); letter-spacing:.03em;}
   .card h3{margin:2px 0 2px; font-size:16px; font-weight:700;}
   .card .maturity{font-size:11px; color:var(--ink-soft); margin-bottom:14px;}
+  .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+  .rate-badge{
+    font-family:var(--mono); font-size:26px; font-weight:800; color:var(--accent);
+    line-height:1; white-space:nowrap; flex-shrink:0;
+  }
+  .rate-badge .rate-unit{font-size:13px; font-weight:700; margin-left:1px;}
+  .credit-tag{font-family:var(--mono); font-weight:700; color:var(--ink-soft);}
 
   .gauge{
     height:14px; border-radius:7px; background:var(--paper); overflow:hidden;
@@ -247,15 +254,21 @@
   /* ---------- 표 스크롤 (모바일 가로 스크롤 포함) ---------- */
   .table-scroll{
     max-height:280px; overflow-y:auto; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain; touch-action:pan-x pan-y;
     border:1px solid var(--line); border-radius:var(--radius); margin-bottom:16px;
   }
   .table-scroll table{border:none; border-radius:0; min-width:max-content;}
   .table-scroll thead th{position:sticky; top:0; z-index:5; box-shadow:0 1px 0 var(--line);}
   .table-scroll-x{
-    overflow-x:auto; -webkit-overflow-scrolling:touch;
+    overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x;
     border:1px solid var(--line); border-radius:var(--radius); margin-bottom:16px;
   }
   .table-scroll-x table{border:none; border-radius:0; min-width:max-content;}
+  .scroll-reset-btn{
+    font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-dim);
+    border:none; border-radius:6px; padding:5px 10px; cursor:pointer; margin-bottom:8px;
+    display:inline-flex; align-items:center; gap:4px;
+  }
   .bulk-import{
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
     margin-bottom:14px; overflow:hidden;
@@ -427,7 +440,7 @@
     <span class="mark">LIMIT</span>
     <h1>원리금보장상품 한도 관제</h1>
     <span class="sub" id="clock"></span>
-    <span class="build-tag">build 2026-08-06-19</span>
+    <span class="build-tag">build 2026-08-06-20</span>
   </div>
   <div class="header-right">
     <button class="admin-toggle" id="adminToggle">관리자 모드</button>
@@ -451,7 +464,8 @@
     <div id="boardSummary" class="board-summary"></div>
     <input id="boardFilter" placeholder="🔍 업권·기관명·신용등급·비고로 검색"
       style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px; margin-bottom:10px;">
-    <div class="table-scroll" style="max-height:420px;">
+    <button type="button" class="scroll-reset-btn" id="boardScrollReset">◀ 표 처음 위치로</button>
+    <div class="table-scroll" id="boardScrollBox" style="max-height:420px;">
       <table id="boardTable">
         <thead>
           <tr>
@@ -556,12 +570,14 @@
     </div>
 
     <div class="section-title"><h2>상품 등록</h2></div>
-    <div class="admin-form" style="grid-template-columns:1.2fr 1fr .8fr .8fr .8fr auto;">
+    <div class="admin-form" style="grid-template-columns:1.1fr 1fr .7fr .8fr .7fr .6fr .6fr auto;">
       <div class="field"><label>상품사</label><input id="apProvider" placeholder="예: 삼성생명"></div>
       <div class="field"><label>상품명</label><input id="apName" placeholder="예: GA-1형"></div>
       <div class="field"><label>만기구분</label><input id="apTenor" placeholder="예: 1년"></div>
       <div class="field"><label>만기일</label><input id="apMaturity" type="date"></div>
       <div class="field"><label>총한도(억)</label><input id="apLimit" type="number" placeholder="1000"></div>
+      <div class="field"><label>금리(%)</label><input id="apRate" type="number" step="0.01" placeholder="3.25"></div>
+      <div class="field"><label>신용등급</label><input id="apCredit" placeholder="AA-"></div>
       <button class="btn btn-primary" style="margin-top:0;" id="addProductBtn">등록</button>
     </div>
 
@@ -572,10 +588,10 @@
       </button>
       <div class="bulk-import-body" id="bulkProductBody">
         <p class="modal-sub" style="margin:0 0 8px;">
-          엑셀에서 <b>상품사, 상품명, 만기구분, 만기일, 총한도</b> 순서로 5개 칸을 같이 선택해서 복사 → 아래 붙여넣기.<br>
-          만기일은 비워도 됩니다(형식: 2027-06-30). 한 줄에 상품 하나씩.
+          엑셀에서 <b>상품사, 상품명, 만기구분, 만기일, 총한도, 금리, 신용등급</b> 순서로 칸을 같이 선택해서 복사 → 아래 붙여넣기.<br>
+          만기일/금리/신용등급은 비워도 됩니다(만기일 형식: 2027-06-30). 한 줄에 상품 하나씩.
         </p>
-        <textarea id="bulkProductText" rows="6" placeholder="삼성생명&#9;GA-1형&#9;1년&#9;2027-06-30&#9;1000&#10;교보생명&#9;확정형A&#9;3년&#9;&#9;500"></textarea>
+        <textarea id="bulkProductText" rows="6" placeholder="삼성생명&#9;GA-1형&#9;1년&#9;2027-06-30&#9;1000&#9;3.25&#9;AA-&#10;교보생명&#9;확정형A&#9;3년&#9;&#9;500&#9;3.1&#9;AA"></textarea>
         <button class="btn btn-primary" style="width:auto; margin-top:10px;" id="bulkProductAddBtn">일괄 등록</button>
       </div>
     </div>
@@ -600,6 +616,8 @@
               <th class="sortable" data-key="tenor_label">만기구분</th>
               <th class="sortable" data-key="maturity">만기일</th>
               <th class="sortable" data-key="total_limit">총한도(억)</th>
+              <th class="sortable" data-key="rate">금리(%)</th>
+              <th class="sortable" data-key="credit_rating">신용등급</th>
               <th class="sortable" data-key="_committed">확정+홀드(억)</th>
               <th class="sortable" data-key="created_at">등록일시</th>
               <th></th>
@@ -711,6 +729,8 @@
     <div class="field"><label>만기구분</label><input id="epTenor" placeholder="예: 1년"></div>
     <div class="field"><label>만기일</label><input id="epMaturity" type="date"></div>
     <div class="field"><label>총한도(억)</label><input id="epLimit" type="number"></div>
+    <div class="field"><label>금리(%)</label><input id="epRate" type="number" step="0.01"></div>
+    <div class="field"><label>신용등급</label><input id="epCredit" placeholder="AA-"></div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="editSubmit">저장</button>
     </div>
@@ -1075,9 +1095,14 @@ function renderProductCard(p) {
   previousAvailable[p.id] = available;
 
   card.innerHTML = `
-    <div class="provider">${escapeHtml(p.provider)}</div>
-    <h3>${escapeHtml(p.name)}${p.tenor_label ? `<span class="tenor-tag">${escapeHtml(p.tenor_label)}</span>` : ''}</h3>
-    <div class="maturity">만기 ${p.maturity ? p.maturity : '—'}</div>
+    <div class="card-top">
+      <div>
+        <div class="provider">${escapeHtml(p.provider)}</div>
+        <h3>${escapeHtml(p.name)}${p.tenor_label ? `<span class="tenor-tag">${escapeHtml(p.tenor_label)}</span>` : ''}</h3>
+      </div>
+      ${p.rate ? `<div class="rate-badge">${p.rate}<span class="rate-unit">%</span></div>` : ''}
+    </div>
+    <div class="maturity">만기 ${p.maturity ? p.maturity : '—'}${p.credit_rating ? ` · <span class="credit-tag">${escapeHtml(p.credit_rating)}</span>` : ''}</div>
     <div class="gauge">
       <div class="seg-confirm" style="width:${confirmPct}%"></div>
       <div class="seg-hold" style="width:${holdPct}%"></div>
@@ -1327,24 +1352,26 @@ document.getElementById('bulkProductAddBtn').onclick = async () => {
 
   const rows = lines.map(line => {
     const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
-    const [provider, name, tenor, maturity, limit] = parts.map(s => (s || '').trim());
+    const [provider, name, tenor, maturity, limit, rate, credit] = parts.map(s => (s || '').trim());
     return {
       provider: provider || '',
       name: name || '',
       tenor: tenor || null,
       maturity: /^\d{4}-\d{2}-\d{2}$/.test(maturity) ? maturity : null,
-      limit: Number(limit)
+      limit: Number(limit),
+      rate: rate && !isNaN(Number(rate)) ? Number(rate) : null,
+      credit: credit || null
     };
   }).filter(r => r.provider && r.name && r.limit > 0);
 
-  if (rows.length === 0) { alert('형식을 인식하지 못했습니다. "상품사, 상품명, 만기구분, 만기일, 총한도" 순서를 확인해주세요.'); return; }
+  if (rows.length === 0) { alert('형식을 인식하지 못했습니다. "상품사, 상품명, 만기구분, 만기일, 총한도, 금리, 신용등급" 순서를 확인해주세요.'); return; }
 
   btn.disabled = true; btn.textContent = '등록 중...';
   let ok = 0, fail = 0;
   for (const r of rows) {
     const { error } = await supabase.rpc('add_product', {
       p_provider: r.provider, p_name: r.name, p_maturity: r.maturity,
-      p_total_limit: r.limit, p_tenor_label: r.tenor
+      p_total_limit: r.limit, p_tenor_label: r.tenor, p_rate: r.rate, p_credit_rating: r.credit
     });
     if (error) fail++; else ok++;
   }
@@ -1361,13 +1388,16 @@ document.getElementById('addProductBtn').onclick = async () => {
   const tenor = document.getElementById('apTenor').value.trim() || null;
   const maturity = document.getElementById('apMaturity').value || null;
   const limit = Number(document.getElementById('apLimit').value);
+  const rate = document.getElementById('apRate').value ? Number(document.getElementById('apRate').value) : null;
+  const credit = document.getElementById('apCredit').value.trim() || null;
   if (!provider || !name || !limit) { alert('상품사 / 상품명 / 총한도를 입력해주세요.'); return; }
 
   const { error } = await supabase.rpc('add_product', {
-    p_provider: provider, p_name: name, p_maturity: maturity, p_total_limit: limit, p_tenor_label: tenor
+    p_provider: provider, p_name: name, p_maturity: maturity, p_total_limit: limit,
+    p_tenor_label: tenor, p_rate: rate, p_credit_rating: credit
   });
   if (error) { alert(error.message); return; }
-  ['apProvider','apName','apTenor','apMaturity','apLimit'].forEach(id => document.getElementById(id).value = '');
+  ['apProvider','apName','apTenor','apMaturity','apLimit','apRate','apCredit'].forEach(id => document.getElementById(id).value = '');
   await loadData();
 };
 
@@ -1399,7 +1429,7 @@ function updateSortArrows() {
 
 function getSortVal(p, key) {
   if (key === '_committed') { const { confirmed, hold } = balanceFor(p.id); return confirmed + hold; }
-  if (key === 'total_limit') return Number(p.total_limit);
+  if (key === 'total_limit' || key === 'rate') return Number(p[key]) || 0;
   return (p[key] || '').toString();
 }
 
@@ -1425,6 +1455,10 @@ function updateSortArrowsFor(tableId, state) {
 wireSortableTable('boardTable', () => boardSort, () => renderBoard());
 wireSortableTable('allTable', () => allocSort, () => renderAllAllocations());
 document.getElementById('boardFilter').oninput = () => renderBoard();
+bindTap(document.getElementById('boardScrollReset'), () => {
+  document.getElementById('boardScrollBox').scrollLeft = 0;
+  document.getElementById('boardScrollBox').scrollTop = 0;
+});
 document.getElementById('allFilter').oninput = () => renderAllAllocations();
 
 function renderProductMgmt() {
@@ -1433,7 +1467,7 @@ function renderProductMgmt() {
   const tbody = document.getElementById('productMgmtTbody');
   tbody.innerHTML = '';
   if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="color:#9aa0a6;">등록된 상품이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="color:#9aa0a6;">등록된 상품이 없습니다.</td></tr>';
     return;
   }
 
@@ -1450,7 +1484,7 @@ function renderProductMgmt() {
   });
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="color:#9aa0a6;">"${escapeHtml(q)}" 검색 결과가 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:#9aa0a6;">"${escapeHtml(q)}" 검색 결과가 없습니다.</td></tr>`;
     return;
   }
 
@@ -1473,6 +1507,8 @@ function renderProductMgmt() {
       <td>${p.tenor_label ? escapeHtml(p.tenor_label) : '—'}</td>
       <td>${p.maturity || '—'}</td>
       <td class="amount">${fmt(p.total_limit)}</td>
+      <td class="amount">${p.rate != null ? p.rate : '—'}</td>
+      <td>${p.credit_rating ? escapeHtml(p.credit_rating) : '—'}</td>
       <td class="amount">${fmt(confirmed + hold)}</td>
       <td class="countdown">${p.created_at ? new Date(p.created_at).toLocaleString('ko-KR') : '—'}</td>
       <td class="row-actions"></td>
@@ -1500,6 +1536,8 @@ function openEditProduct(p) {
   document.getElementById('epTenor').value = p.tenor_label || '';
   document.getElementById('epMaturity').value = p.maturity || '';
   document.getElementById('epLimit').value = p.total_limit;
+  document.getElementById('epRate').value = p.rate || '';
+  document.getElementById('epCredit').value = p.credit_rating || '';
   document.getElementById('editErr').classList.remove('show');
   window.scrollTo({ top: 0 });
   editOverlay.classList.add('show');
@@ -1513,6 +1551,8 @@ bindTap(document.getElementById('editSubmit'), async () => {
   const tenor = document.getElementById('epTenor').value.trim() || null;
   const maturity = document.getElementById('epMaturity').value || null;
   const limit = Number(document.getElementById('epLimit').value);
+  const rate = document.getElementById('epRate').value ? Number(document.getElementById('epRate').value) : null;
+  const credit = document.getElementById('epCredit').value.trim() || null;
   const errBox = document.getElementById('editErr');
   errBox.classList.remove('show');
 
@@ -1529,7 +1569,9 @@ bindTap(document.getElementById('editSubmit'), async () => {
     p_name: name,
     p_maturity: maturity,
     p_total_limit: limit,
-    p_tenor_label: tenor
+    p_tenor_label: tenor,
+    p_rate: rate,
+    p_credit_rating: credit
   });
 
   if (error) {
@@ -1727,10 +1769,10 @@ function downloadCsv(filename, rows) {
 }
 
 document.getElementById('exportLimitCsv').onclick = () => {
-  const rows = [['상품사','상품명','만기구분','만기일','총한도(억)','확정매수(억)','제안홀드(억)','신청가능잔액(억)']];
+  const rows = [['상품사','상품명','만기구분','만기일','금리(%)','신용등급','총한도(억)','확정매수(억)','제안홀드(억)','신청가능잔액(억)']];
   products.forEach(p => {
     const { confirmed, hold } = balanceFor(p.id);
-    rows.push([p.provider, p.name, p.tenor_label || '', p.maturity || '', p.total_limit, confirmed, hold, Number(p.total_limit)-confirmed-hold]);
+    rows.push([p.provider, p.name, p.tenor_label || '', p.maturity || '', p.rate ?? '', p.credit_rating || '', p.total_limit, confirmed, hold, Number(p.total_limit)-confirmed-hold]);
   });
   downloadCsv(`한도현황_${todayStr()}.csv`, rows);
 };
