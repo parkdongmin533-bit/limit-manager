@@ -227,7 +227,7 @@
   .board-sum-card.grand{background:var(--ink); color:#fff;}
   .board-sum-card.grand .label{color:#9aa2af;}
   #boardTable td, #boardTable th{white-space:nowrap;}
-  #boardTable td.note-cell{white-space:normal; max-width:220px; font-size:12px; color:var(--ink-soft);}
+  #boardTable td.note-cell{font-size:12px; color:var(--ink-soft); min-width:260px;}
 
   /* ---------- CSV 내보내기 ---------- */
   .export-row{display:flex; gap:10px; margin-bottom:16px;}
@@ -239,11 +239,11 @@
 
   /* ---------- RM 명단 스크롤 / 일괄등록 ---------- */
   .table-scroll{
-    max-height:280px; overflow-y:auto; border:1px solid var(--line); border-radius:var(--radius);
+    max-height:280px; overflow-y:auto; overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius);
     margin-bottom:16px;
   }
   .table-scroll table{border:none; border-radius:0;}
-  .table-scroll thead th{position:sticky; top:0; z-index:1;}
+  .table-scroll thead th{position:sticky; top:0; z-index:5; box-shadow:0 1px 0 var(--line);}
   .bulk-import{
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
     margin-bottom:14px; overflow:hidden;
@@ -301,7 +301,8 @@
 
   /* ---------- Table (내 신청내역 / 관리자) ---------- */
   table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
-  th,td{padding:10px 14px; text-align:left; font-size:13px; border-bottom:1px solid var(--line);}
+  th,td{padding:10px 14px; text-align:left; font-size:13px; border-bottom:1px solid var(--line); border-right:1px solid var(--line);}
+  th:last-child, td:last-child{border-right:none;}
   th{
     font-family:var(--mono); font-size:11px; color:var(--ink-soft); font-weight:600;
     text-transform:uppercase; letter-spacing:.04em; background:#FAFAF8;
@@ -407,13 +408,26 @@
       <span class="board-asof" id="boardAsOf"></span>
     </div>
     <div id="boardSummary" class="board-summary"></div>
+    <input id="boardFilter" placeholder="🔍 업권·기관명·신용등급·비고로 검색"
+      style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px; margin-bottom:10px;">
     <div class="table-scroll" style="max-height:420px;">
       <table id="boardTable">
         <thead>
           <tr>
-            <th>업권</th><th>기관명</th><th>신용등급</th>
-            <th>1년</th><th>2년</th><th>3년</th><th>5년</th><th>기타금리</th>
-            <th>1년한도</th><th>1.5년</th><th>2년한도</th><th>3년한도</th><th>5년한도</th><th>합계</th>
+            <th class="sortable" data-key="sector">업권</th>
+            <th class="sortable" data-key="institution">기관명</th>
+            <th class="sortable" data-key="credit_rating">신용등급</th>
+            <th class="sortable" data-key="rate_1y">1년</th>
+            <th class="sortable" data-key="rate_2y">2년</th>
+            <th class="sortable" data-key="rate_3y">3년</th>
+            <th class="sortable" data-key="rate_5y">5년</th>
+            <th>기타금리</th>
+            <th class="sortable" data-key="limit_1y">1년한도</th>
+            <th class="sortable" data-key="limit_1_5y">1.5년</th>
+            <th class="sortable" data-key="limit_2y">2년한도</th>
+            <th class="sortable" data-key="limit_3y">3년한도</th>
+            <th class="sortable" data-key="limit_5y">5년한도</th>
+            <th class="sortable" data-key="_total">합계</th>
             <th>비고</th>
           </tr>
         </thead>
@@ -452,7 +466,8 @@
       </div>
       <div class="bulk-import-body" id="boardBody">
         <p class="modal-sub" style="margin:0 0 8px;">
-          열 순서: <b>업권, 기관명, 신용등급, 1년금리, 2년금리, 3년금리, 5년금리, 기타금리, 1년한도, 1.5년한도, 2년한도, 3년한도, 5년한도, 비고</b> (14열)<br>
+          열 순서: <b>업권, 기관명, 신용등급, 1년금리, 2년금리, 3년금리, 5년금리, 기타금리, 1년한도, 1.5년한도, 2년한도, 3년한도, 5년한도, (합계), 비고</b><br>
+          엑셀의 "합계" 열까지 통째로 선택해서 붙여넣으셔도 되고, 빼고 붙여넣으셔도 자동으로 알아서 인식합니다. 합계만 있고 만기별 세부금액이 없는 기관은 그 합계 숫자를 그대로 씁니다.<br>
           엑셀 병합셀 때문에 "업권"이 중간에 비어 나오면 바로 위 행 값을 자동으로 이어받습니다. 숫자 칸은 비워도 됩니다.<br>
           ⚠ 등록 버튼을 누르면 기존 현황판 내용은 <b>전부 교체</b>됩니다 (실시간 잔액 추적 데이터와는 무관, 이 게시판만 바뀜).
         </p>
@@ -583,12 +598,25 @@
     </div>
 
     <div class="section-title"><h2>전체 신청내역</h2></div>
+    <input id="allFilter" placeholder="🔍 상품·RM·센터·고객법인으로 검색"
+      style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px; margin-bottom:10px;">
+    <div class="table-scroll" style="max-height:420px;">
     <table id="allTable">
       <thead>
-        <tr><th>상품</th><th>RM</th><th>센터</th><th>고객법인</th><th>금액(억)</th><th>상태</th><th>신청시각</th><th></th></tr>
+        <tr>
+          <th class="sortable" data-key="_product">상품</th>
+          <th class="sortable" data-key="rm_name">RM</th>
+          <th class="sortable" data-key="center">센터</th>
+          <th class="sortable" data-key="corp_name">고객법인</th>
+          <th class="sortable" data-key="amount">금액(억)</th>
+          <th class="sortable" data-key="status">상태</th>
+          <th class="sortable" data-key="created_at">신청시각</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody id="allTbody"></tbody>
     </table>
+    </div>
   </div>
 
 </main>
@@ -741,11 +769,23 @@ function balanceFor(productId) {
 
 // ---------- 렌더: 전체 상품 현황판 ----------
 function boardRowTotal(r) {
-  return ['limit_1y','limit_1_5y','limit_2y','limit_3y','limit_5y']
+  const sum = ['limit_1y','limit_1_5y','limit_2y','limit_3y','limit_5y']
     .reduce((s, k) => s + (Number(r[k]) || 0), 0);
+  if (sum === 0 && r.limit_total) return Number(r.limit_total); // 세부 만기별 입력이 없고 합계만 있는 경우
+  return sum;
+}
+
+let boardSort = { key: 'institution', dir: 'asc' };
+
+function getBoardSortVal(r, key) {
+  if (key === '_total') return boardRowTotal(r);
+  const numericKeys = ['rate_1y','rate_2y','rate_3y','rate_5y','limit_1y','limit_1_5y','limit_2y','limit_3y','limit_5y'];
+  if (numericKeys.includes(key)) return Number(r[key]) || 0;
+  return (r[key] || '').toString().toLowerCase();
 }
 
 function renderBoard() {
+  updateSortArrowsFor('boardTable', boardSort);
   const asOfEl = document.getElementById('boardAsOf');
   const summaryEl = document.getElementById('boardSummary');
   const tbody = document.getElementById('boardTbody');
@@ -760,6 +800,7 @@ function renderBoard() {
   const asOf = boardRows.find(r => r.as_of_date)?.as_of_date;
   asOfEl.textContent = asOf ? `${asOf} 기준` : '';
 
+  // 요약 카드는 전체 데이터 기준 (필터와 무관하게 항상 전체 그림을 보여줌)
   const bySector = new Map();
   let grand = 0;
   boardRows.forEach(r => {
@@ -775,7 +816,24 @@ function renderBoard() {
   cards += `<div class="board-sum-card grand"><div class="label">전체 합계</div><div class="val">${fmt(grand)}억</div></div>`;
   summaryEl.innerHTML = cards;
 
-  tbody.innerHTML = boardRows.map(r => `
+  const q = (document.getElementById('boardFilter').value || '').trim().toLowerCase();
+  let rows = boardRows.filter(r =>
+    !q || (r.sector||'').toLowerCase().includes(q) || r.institution.toLowerCase().includes(q) ||
+    (r.credit_rating||'').toLowerCase().includes(q) || (r.note||'').toLowerCase().includes(q));
+
+  rows = [...rows].sort((a, b) => {
+    const va = getBoardSortVal(a, boardSort.key), vb = getBoardSortVal(b, boardSort.key);
+    if (va < vb) return boardSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return boardSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="15" style="color:#9aa0a6;">"${escapeHtml(q)}" 검색 결과가 없습니다.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.sector ? escapeHtml(r.sector) : '—'}</td>
       <td><b>${escapeHtml(r.institution)}</b></td>
@@ -816,6 +874,10 @@ document.getElementById('boardReplaceBtn').onclick = async () => {
     const c = line.split('\t');
     let sector = (c[0] || '').trim();
     if (sector) lastSector = sector; else sector = lastSector;
+    // 엑셀 원본에 "합계" 열까지 포함해서 붙여넣으면 15열(비고는 14번 인덱스), 안 넣으면 14열(비고는 13번 인덱스) — 둘 다 자동 인식
+    const hasTotalCol = c.length >= 15;
+    const noteIdx = hasTotalCol ? 14 : 13;
+    const pastedTotal = hasTotalCol ? num(c[13]) : null;
     return {
       sector: sector || null,
       institution: (c[1] || '').trim(),
@@ -823,7 +885,8 @@ document.getElementById('boardReplaceBtn').onclick = async () => {
       rate_1y: num(c[3]), rate_2y: num(c[4]), rate_3y: num(c[5]), rate_5y: num(c[6]),
       rate_other: (c[7] || '').trim() || null,
       limit_1y: num(c[8]), limit_1_5y: num(c[9]), limit_2y: num(c[10]), limit_3y: num(c[11]), limit_5y: num(c[12]),
-      note: (c[13] || '').trim() || null
+      limit_total: pastedTotal,
+      note: (c[noteIdx] || '').trim() || null
     };
   }).filter(r => r.institution);
 
@@ -1267,6 +1330,30 @@ function getSortVal(p, key) {
   return (p[key] || '').toString();
 }
 
+// ---------- 범용 정렬 헤더 배선 (게시판 / 전체 신청내역에서 재사용) ----------
+function wireSortableTable(tableId, getState, onChange) {
+  document.querySelectorAll(`#${tableId} th.sortable`).forEach(th => {
+    th.dataset.label = th.textContent.trim();
+    th.onclick = () => {
+      const key = th.dataset.key;
+      const state = getState();
+      if (state.key === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      else { state.key = key; state.dir = 'asc'; }
+      onChange();
+    };
+  });
+}
+function updateSortArrowsFor(tableId, state) {
+  document.querySelectorAll(`#${tableId} th.sortable`).forEach(th => {
+    const arrow = th.dataset.key === state.key ? (state.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    th.textContent = th.dataset.label + arrow;
+  });
+}
+wireSortableTable('boardTable', () => boardSort, () => renderBoard());
+wireSortableTable('allTable', () => allocSort, () => renderAllAllocations());
+document.getElementById('boardFilter').oninput = () => renderBoard();
+document.getElementById('allFilter').oninput = () => renderAllAllocations();
+
 function renderProductMgmt() {
   document.getElementById('productMgmtCount').textContent = products.length;
   updateSortArrows();
@@ -1397,17 +1484,48 @@ document.getElementById('purgeAllProductsBtn').onclick = async () => {
   alert('전체 상품과 신청내역이 삭제되었습니다.');
 };
 
+let allocSort = { key: 'created_at', dir: 'desc' };
+
 function renderAllAllocations() {
+  updateSortArrowsFor('allTable', allocSort);
   const tbody = document.getElementById('allTbody');
   tbody.innerHTML = '';
-  allocations.forEach(a => {
+
+  const q = (document.getElementById('allFilter').value || '').trim().toLowerCase();
+  let rows = allocations.map(a => {
     const product = products.find(p => p.id === a.product_id);
+    return { a, product, label: product ? `${product.provider} · ${product.name}` : '—' };
+  });
+  if (q) {
+    rows = rows.filter(({ a, label }) =>
+      label.toLowerCase().includes(q) || a.rm_name.toLowerCase().includes(q) ||
+      (a.center || '').toLowerCase().includes(q) || a.corp_name.toLowerCase().includes(q));
+  }
+  rows.sort((r1, r2) => {
+    const getVal = (r) => {
+      if (allocSort.key === '_product') return r.label.toLowerCase();
+      if (allocSort.key === 'amount') return Number(r.a.amount);
+      const v = r.a[allocSort.key];
+      return typeof v === 'string' ? v.toLowerCase() : (v || '');
+    };
+    const va = getVal(r1), vb = getVal(r2);
+    if (va < vb) return allocSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return allocSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#9aa0a6;">${q ? `"${escapeHtml(q)}" 검색 결과가 없습니다.` : '신청 내역이 없습니다.'}</td></tr>`;
+    return;
+  }
+
+  rows.forEach(({ a, label }) => {
     const expired = a.status === 'proposed' && new Date(a.hold_expires_at) < new Date();
     const statusKey = expired ? 'expired' : a.status;
     const statusLabel = { proposed:'제안(홀드)', confirmed:'확정', cancelled:'취소', expired:'홀드만료' }[statusKey];
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${product ? escapeHtml(product.provider+' · '+product.name) : '—'}</td>
+      <td>${escapeHtml(label)}</td>
       <td>${escapeHtml(a.rm_name)}</td>
       <td>${a.center ? escapeHtml(a.center) : '—'}</td>
       <td>${escapeHtml(a.corp_name)}</td>
