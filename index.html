@@ -350,10 +350,13 @@
 
   /* ---------- Modal ---------- */
   .overlay{
-    position:fixed; inset:0; background:#12161Ccc; display:none;
-    align-items:center; justify-content:center; z-index:50; padding:20px;
+    position:fixed; inset:0; background:#12161Ccc;
+    display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
+    opacity:0; visibility:hidden; pointer-events:none;
   }
-  .overlay.show{display:flex;}
+  /* display:none → flex로 갑자기 나타나면 일부 모바일 브라우저가 터치 인식 영역을 늦게 계산하는
+     버그가 있어서, 항상 레이아웃에 존재시키고 opacity/visibility로만 전환 (여러 번 눌러야 되던 문제 대응) */
+  .overlay.show{ opacity:1; visibility:visible; pointer-events:auto; }
   .modal{
     background:var(--surface); border-radius:12px; width:100%; max-width:420px;
     padding:24px; box-shadow:0 20px 50px #0006;
@@ -668,17 +671,18 @@
       <input id="mAmount" type="number" placeholder="200">
     </div>
     <div class="field">
-      <label>홀드 유지기간</label>
-      <div style="display:grid; grid-template-columns:90px 1fr; gap:8px;">
-        <input id="mHoldValue" type="text" inputmode="numeric" pattern="[0-9]*" value="1" style="width:100%; min-width:0;">
-        <select id="mHoldUnit" style="width:100%; min-width:0;">
-          <option value="1">분</option>
-          <option value="60" selected>시간</option>
-          <option value="1440">일</option>
-          <option value="10080">주</option>
-        </select>
-      </div>
-      <div class="amount-hint">홀드 기간 내 확정하지 않으면 잔액이 자동 복구됩니다. (예: 3주짜리 딜이면 "3" + "주" 선택)</div>
+      <label>홀드 유지기간 — 숫자</label>
+      <input id="mHoldValue" type="text" inputmode="numeric" pattern="[0-9]*" value="1" placeholder="1">
+    </div>
+    <div class="field">
+      <label>홀드 유지기간 — 단위</label>
+      <select id="mHoldUnit">
+        <option value="1">분</option>
+        <option value="60" selected>시간</option>
+        <option value="1440">일</option>
+        <option value="10080">주</option>
+      </select>
+      <div class="amount-hint">홀드 기간 내 확정하지 않으면 잔액이 자동 복구됩니다. (예: 3주짜리 딜이면 숫자 "3" + 단위 "주" 선택)</div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modalCancel">취소</button>
