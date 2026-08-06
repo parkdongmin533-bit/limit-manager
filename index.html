@@ -40,7 +40,7 @@
 
   /* ---------- Header ---------- */
   header{
-    position:sticky; top:0; z-index:20;
+    position:fixed; top:0; left:0; right:0; z-index:20;
     display:flex; align-items:center; justify-content:space-between;
     padding:14px 28px; background:var(--ink); color:#fff;
     border-bottom:1px solid #000;
@@ -254,20 +254,20 @@
   /* ---------- 표 스크롤 (모바일 가로 스크롤 포함) ---------- */
   .table-scroll{
     max-height:280px; overflow-y:auto; overflow-x:auto; -webkit-overflow-scrolling:touch;
-    overscroll-behavior:contain; touch-action:pan-x pan-y;
+    overscroll-behavior:contain;
     border:1px solid var(--line); border-radius:var(--radius); margin-bottom:16px;
   }
   .table-scroll table{border:none; border-radius:0; min-width:max-content;}
   .table-scroll thead th{position:sticky; top:0; z-index:5; box-shadow:0 1px 0 var(--line);}
   .table-scroll-x{
-    overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x;
+    overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
     border:1px solid var(--line); border-radius:var(--radius); margin-bottom:16px;
   }
   .table-scroll-x table{border:none; border-radius:0; min-width:max-content;}
   .scroll-reset-btn{
-    font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-dim);
-    border:none; border-radius:6px; padding:5px 10px; cursor:pointer; margin-bottom:8px;
-    display:inline-flex; align-items:center; gap:4px;
+    font-family:var(--mono); font-size:11px; color:#fff; background:var(--accent);
+    border:none; border-radius:6px; padding:6px 12px; cursor:pointer; margin-bottom:8px;
+    display:inline-flex; align-items:center; gap:4px; touch-action:manipulation;
   }
   .bulk-import{
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
@@ -440,7 +440,7 @@
     <span class="mark">LIMIT</span>
     <h1>원리금보장상품 한도 관제</h1>
     <span class="sub" id="clock"></span>
-    <span class="build-tag">build 2026-08-06-20</span>
+    <span class="build-tag">build 2026-08-06-21</span>
   </div>
   <div class="header-right">
     <button class="admin-toggle" id="adminToggle">관리자 모드</button>
@@ -803,6 +803,17 @@ document.getElementById('adminToggle').onclick = () => {
   render();
 };
 
+// ---------- 헤더 고정(fixed)에 맞춰 본문 여백 자동 조정 ----------
+// sticky가 이 환경에서 불안정해서 fixed로 바꿨는데, fixed는 레이아웃 흐름에서 빠지므로
+// 헤더 높이(모바일에서는 줄바꿈되어 더 커짐)만큼 본문 상단 여백을 JS로 정확히 맞춰줌
+function adjustHeaderSpacing() {
+  const h = document.querySelector('header');
+  if (h) document.body.style.paddingTop = h.offsetHeight + 'px';
+}
+adjustHeaderSpacing();
+window.addEventListener('resize', adjustHeaderSpacing);
+window.addEventListener('orientationchange', adjustHeaderSpacing);
+
 // ---------- 시계 ----------
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR', {hour12:false});
@@ -827,6 +838,7 @@ async function loadData() {
   renderRmSelect();
   renderBoard();
   render();
+  adjustHeaderSpacing(); // RM 목록 등으로 헤더 줄바꿈이 바뀔 수 있어 매 로드마다 재계산
 }
 
 // ---------- 잔액 계산 ----------
