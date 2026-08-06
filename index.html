@@ -190,8 +190,24 @@
   .rank-row .rname{width:80px; flex-shrink:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .rank-row .rbar-wrap{flex:1; background:var(--paper); border-radius:5px; height:16px; overflow:hidden;}
   .rank-row .rbar{height:100%; background:var(--accent); border-radius:5px; transition:width .4s ease;}
-  .rank-row .rval{font-family:var(--mono); font-size:12px; width:64px; text-align:right; flex-shrink:0;}
+  .rank-row .rval{font-family:var(--mono); font-size:12px; width:90px; text-align:right; flex-shrink:0;}
+  .rank-row .rpct{color:var(--ink-soft); font-size:11px;}
   .rank-empty{color:var(--ink-soft); font-size:12px;}
+  .rank-row.concentrated .rbar{background:var(--danger);}
+  .rank-row.concentrated .rname{color:var(--danger);}
+
+  .perf-tabs{display:flex; gap:6px; margin-bottom:14px;}
+  .perf-tab{
+    font-family:var(--mono); font-size:12px; padding:7px 14px; border-radius:20px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); cursor:pointer;
+  }
+  .perf-tab.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  .danger-zone{
+    margin-top:16px; padding:14px 16px; border:1px dashed var(--danger); border-radius:var(--radius);
+    background:var(--danger-dim); font-size:12.5px; color:var(--ink-soft); line-height:1.6;
+  }
+  .danger-zone b{color:var(--danger);}
 
   /* ---------- CSV 내보내기 ---------- */
   .export-row{display:flex; gap:10px; margin-bottom:16px;}
@@ -472,17 +488,28 @@
           <tbody id="productMgmtTbody"></tbody>
         </table>
         </div>
+        <div class="danger-zone">
+          <b>⚠ 위험 구역</b> — 전체 상품을 한 번에 삭제합니다. 관련된 모든 신청내역(제안/확정/취소 이력 전부)도 같이 사라지며 되돌릴 수 없습니다.
+          <button class="btn btn-sm btn-danger" style="margin-top:8px;" id="purgeAllProductsBtn">전체 상품 삭제</button>
+        </div>
       </div>
     </div>
 
-    <div class="section-title"><h2>실적 대시보드 (확정매수 기준)</h2></div>
+    <div class="section-title">
+      <h2>실적 대시보드</h2>
+    </div>
+    <div class="perf-tabs" id="perfTabs">
+      <button class="perf-tab active" data-mode="confirmed">확정 기준</button>
+      <button class="perf-tab" data-mode="hold">홀드(제안) 기준</button>
+      <button class="perf-tab" data-mode="total">합계(확정+홀드)</button>
+    </div>
     <div class="rank-panels">
       <div class="rank-panel">
-        <h4>RM별</h4>
+        <h4>RM별 <span id="rankRmTotal" style="font-weight:400; color:var(--ink-soft);"></span></h4>
         <div id="rankByRm"></div>
       </div>
       <div class="rank-panel">
-        <h4>센터별</h4>
+        <h4>센터(팀)별 <span id="rankCenterTotal" style="font-weight:400; color:var(--ink-soft);"></span></h4>
         <div id="rankByCenter"></div>
       </div>
     </div>
@@ -915,6 +942,8 @@ document.getElementById('bulkToggle').onclick = () => {
 };
 
 document.getElementById('bulkAddBtn').onclick = async () => {
+  const btn = document.getElementById('bulkAddBtn');
+  if (btn.disabled) return; // 이중 클릭 방지
   const raw = document.getElementById('bulkText').value;
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) { alert('붙여넣은 내용이 없습니다.'); return; }
@@ -926,11 +955,13 @@ document.getElementById('bulkAddBtn').onclick = async () => {
 
   if (rows.length === 0) { alert('이름을 인식하지 못했습니다. 형식을 확인해주세요.'); return; }
 
+  btn.disabled = true; btn.textContent = '등록 중...';
   let ok = 0, fail = 0, failNames = [];
   for (const r of rows) {
     const { error } = await supabase.rpc('add_rm', { p_name: r.name, p_center: r.center });
     if (error) { fail++; failNames.push(r.name); } else { ok++; }
   }
+  btn.disabled = false; btn.textContent = '일괄 등록';
 
   document.getElementById('bulkText').value = '';
   await loadData();
@@ -985,6 +1016,8 @@ document.getElementById('bulkProductToggle').onclick = () => {
 
 document.getElementById('bulkProductAddBtn').onclick = async () => {
   const raw = document.getElementById('bulkProductText').value;
+  const btn = document.getElementById('bulkProductAddBtn');
+  if (btn.disabled) return; // 이중 클릭 방지
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) { alert('붙여넣은 내용이 없습니다.'); return; }
 
@@ -1002,6 +1035,7 @@ document.getElementById('bulkProductAddBtn').onclick = async () => {
 
   if (rows.length === 0) { alert('형식을 인식하지 못했습니다. "상품사, 상품명, 만기구분, 만기일, 총한도" 순서를 확인해주세요.'); return; }
 
+  btn.disabled = true; btn.textContent = '등록 중...';
   let ok = 0, fail = 0;
   for (const r of rows) {
     const { error } = await supabase.rpc('add_product', {
@@ -1010,6 +1044,7 @@ document.getElementById('bulkProductAddBtn').onclick = async () => {
     });
     if (error) fail++; else ok++;
   }
+  btn.disabled = false; btn.textContent = '일괄 등록';
 
   document.getElementById('bulkProductText').value = '';
   await loadData();
@@ -1174,6 +1209,16 @@ async function deleteProduct(p) {
   await loadData();
 }
 
+document.getElementById('purgeAllProductsBtn').onclick = async () => {
+  if (!confirm(`정말로 전체 상품(${products.length}개)과 그에 딸린 모든 신청내역을 삭제하시겠습니까?\n이 작업은 절대 되돌릴 수 없습니다.`)) return;
+  const typed = prompt('진짜로 실행하려면 아래 칸에 정확히 "삭제" 라고 입력하세요.');
+  if (typed !== '삭제') { alert('입력이 일치하지 않아 취소되었습니다.'); return; }
+  const { error } = await supabase.rpc('admin_purge_all_products');
+  if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
+  await loadData();
+  alert('전체 상품과 신청내역이 삭제되었습니다.');
+};
+
 function renderAllAllocations() {
   const tbody = document.getElementById('allTbody');
   tbody.innerHTML = '';
@@ -1235,35 +1280,63 @@ async function adminDeleteAlloc(a) {
   await loadData();
 }
 
-// ---------- 실적 대시보드 (RM별 / 센터별, 확정매수 기준) ----------
+// ---------- 실적 대시보드 (RM별 / 센터별, 확정/홀드/합계 전환) ----------
+let perfMode = 'confirmed'; // confirmed | hold | total
+
+document.querySelectorAll('.perf-tab').forEach(btn => {
+  btn.onclick = () => {
+    perfMode = btn.dataset.mode;
+    document.querySelectorAll('.perf-tab').forEach(b => b.classList.toggle('active', b === btn));
+    renderPerformance();
+  };
+});
+
+function statusFilterForMode(a) {
+  const now = new Date();
+  const activeHold = a.status === 'proposed' && new Date(a.hold_expires_at) > now;
+  if (perfMode === 'confirmed') return a.status === 'confirmed';
+  if (perfMode === 'hold') return activeHold;
+  return a.status === 'confirmed' || activeHold; // total
+}
+
 function renderPerformance() {
-  renderRankPanel('rankByRm', groupSum(a => a.rm_name));
-  renderRankPanel('rankByCenter', groupSum(a => a.center || '미지정'));
+  const modeLabel = { confirmed:'확정', hold:'홀드(제안)', total:'확정+홀드' }[perfMode];
+  const rmRows = groupSum(a => a.rm_name);
+  const centerRows = groupSum(a => a.center || '미지정');
+  document.getElementById('rankRmTotal').textContent = `(${modeLabel} 기준)`;
+  document.getElementById('rankCenterTotal').textContent = `(${modeLabel} 기준)`;
+  renderRankPanel('rankByRm', rmRows);
+  renderRankPanel('rankByCenter', centerRows, true);
 }
 
 function groupSum(keyFn) {
   const map = new Map();
-  allocations.filter(a => a.status === 'confirmed').forEach(a => {
+  allocations.filter(statusFilterForMode).forEach(a => {
     const key = keyFn(a);
     map.set(key, (map.get(key) || 0) + Number(a.amount));
   });
   return [...map.entries()].sort((a,b) => b[1]-a[1]);
 }
 
-function renderRankPanel(elId, rows) {
+function renderRankPanel(elId, rows, flagConcentration) {
   const el = document.getElementById(elId);
+  const emptyLabel = { confirmed:'확정매수', hold:'홀드(제안)', total:'확정+홀드' }[perfMode];
   if (rows.length === 0) {
-    el.innerHTML = '<div class="rank-empty">확정매수 내역이 아직 없습니다.</div>';
+    el.innerHTML = `<div class="rank-empty">${emptyLabel} 내역이 아직 없습니다.</div>`;
     return;
   }
   const max = rows[0][1];
-  el.innerHTML = rows.map(([name, sum]) => `
-    <div class="rank-row">
-      <span class="rname" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+  const grandTotal = rows.reduce((s, [,v]) => s + v, 0);
+  el.innerHTML = rows.map(([name, sum]) => {
+    const pct = grandTotal > 0 ? sum / grandTotal * 100 : 0;
+    const concentrated = flagConcentration && pct >= 45;
+    return `
+    <div class="rank-row ${concentrated?'concentrated':''}">
+      <span class="rname" title="${escapeHtml(name)}${concentrated?' — 쏠림 주의':''}">${escapeHtml(name)}${concentrated?' ⚠':''}</span>
       <span class="rbar-wrap"><span class="rbar" style="width:${max>0 ? sum/max*100 : 0}%"></span></span>
-      <span class="rval">${fmt(sum)}억</span>
+      <span class="rval">${fmt(sum)}억 <span class="rpct">(${pct.toFixed(0)}%)</span></span>
     </div>
-  `).join('');
+  `; }).join('');
 }
 
 // ---------- CSV 내보내기 ----------
