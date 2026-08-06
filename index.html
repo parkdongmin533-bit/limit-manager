@@ -197,6 +197,9 @@
   .export-row{display:flex; gap:10px; margin-bottom:16px;}
 
   .toast.alert{border-left-color:var(--danger);}
+  th.sortable{cursor:pointer; user-select:none;}
+  th.sortable:hover{color:var(--ink);}
+  th.sortable .arrow{font-family:var(--mono); margin-left:3px; color:var(--accent);}
 
   /* ---------- RM 명단 스크롤 / 일괄등록 ---------- */
   .table-scroll{
@@ -366,6 +369,8 @@
     <h2>기관별 실시간 잔액</h2>
     <span class="count" id="productCount">0</span>
   </div>
+  <input id="productSearch" placeholder="🔍 상품사·상품명·만기구분으로 찾기 (입력하면 자동으로 펼쳐집니다)"
+    style="width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:8px; font-size:13px; margin-bottom:14px; background:var(--surface);">
   <div id="productGrid">
     <div class="empty">상품이 없습니다. 관리자 모드에서 상품을 등록해주세요.</div>
   </div>
@@ -439,13 +444,36 @@
       </div>
     </div>
 
-    <div class="section-title"><h2>상품 관리</h2></div>
-    <table id="productMgmtTable" style="margin-bottom:8px;">
-      <thead>
-        <tr><th>상품사</th><th>상품명</th><th>만기구분</th><th>만기일</th><th>총한도(억)</th><th>확정+홀드(억)</th><th></th></tr>
-      </thead>
-      <tbody id="productMgmtTbody"></tbody>
-    </table>
+    <div class="section-title">
+      <h2>상품 관리</h2>
+      <span class="count" id="productMgmtCount">0</span>
+    </div>
+    <div class="inst-card" style="margin-bottom:16px;">
+      <div class="inst-header" id="productMgmtToggle" style="cursor:pointer;">
+        <span class="inst-chevron" id="productMgmtChevron">▶</span>
+        <span style="font-size:13px; color:var(--ink-soft);">클릭해서 펼치기 / 접기 (목록이 길면 접어두세요)</span>
+      </div>
+      <div class="inst-body" id="productMgmtBody">
+        <input id="productMgmtFilter" placeholder="상품사·상품명·만기구분으로 검색" style="width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px; margin:14px 0 10px;">
+        <div class="table-scroll">
+        <table id="productMgmtTable" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th class="sortable" data-key="provider">상품사</th>
+              <th class="sortable" data-key="name">상품명</th>
+              <th class="sortable" data-key="tenor_label">만기구분</th>
+              <th class="sortable" data-key="maturity">만기일</th>
+              <th class="sortable" data-key="total_limit">총한도(억)</th>
+              <th class="sortable" data-key="_committed">확정+홀드(억)</th>
+              <th class="sortable" data-key="created_at">등록일시</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="productMgmtTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
 
     <div class="section-title"><h2>실적 대시보드 (확정매수 기준)</h2></div>
     <div class="rank-panels">
@@ -491,14 +519,17 @@
       <input id="mAmount" type="number" placeholder="200">
     </div>
     <div class="field">
-      <label>홀드 유지시간</label>
-      <select id="mHold">
-        <option value="30">30분</option>
-        <option value="60" selected>60분</option>
-        <option value="120">2시간</option>
-        <option value="240">4시간</option>
-      </select>
-      <div class="amount-hint">홀드 시간 내 확정하지 않으면 잔액이 자동 복구됩니다.</div>
+      <label>홀드 유지기간</label>
+      <div style="display:flex; gap:8px;">
+        <input id="mHoldValue" type="number" min="1" value="1" style="flex:1;">
+        <select id="mHoldUnit" style="flex:1;">
+          <option value="1">분</option>
+          <option value="60" selected>시간</option>
+          <option value="1440">일</option>
+          <option value="10080">주</option>
+        </select>
+      </div>
+      <div class="amount-hint">홀드 기간 내 확정하지 않으면 잔액이 자동 복구됩니다. (예: 3주짜리 딜이면 "3" + "주" 선택)</div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modalCancel">취소</button>
@@ -616,8 +647,10 @@ function balanceFor(productId) {
 
 // ---------- 렌더: 기관별 계층 카드 ----------
 let previousAvailable = {}; // for flash animation on realtime change
-let collapsedInst = new Set(); // 접힌 기관 목록
+let openInst = new Set(); // 명시적으로 펼친 기관 목록 (기본은 전부 접힘)
 let alertedProducts = new Set(); // 이미 소진임박 알림 보낸 상품 (세션 내 중복 방지)
+
+document.getElementById('productSearch').oninput = () => renderProducts();
 
 function render() {
   renderProducts();
@@ -644,10 +677,23 @@ function renderProducts() {
     return;
   }
 
+  const q = (document.getElementById('productSearch').value || '').trim().toLowerCase();
   const groups = groupByProvider();
   wrap.innerHTML = '';
+  let anyRendered = false;
 
   groups.forEach((list, provider) => {
+    let matchedList = list;
+    let providerMatches = true;
+    if (q) {
+      providerMatches = provider.toLowerCase().includes(q);
+      const productMatches = list.filter(p =>
+        p.name.toLowerCase().includes(q) || (p.tenor_label || '').toLowerCase().includes(q));
+      if (!providerMatches && productMatches.length === 0) return; // 이 기관은 검색 결과 없음 -> 스킵
+      matchedList = providerMatches ? list : productMatches;
+    }
+    anyRendered = true;
+
     let total = 0, confirmed = 0, hold = 0;
     list.forEach(p => {
       const b = balanceFor(p.id);
@@ -658,7 +704,7 @@ function renderProducts() {
     const available = total - confirmed - hold;
     const confirmPct = total > 0 ? Math.min(100, confirmed/total*100) : 0;
     const holdPct = total > 0 ? Math.min(100-confirmPct, hold/total*100) : 0;
-    const isOpen = !collapsedInst.has(provider);
+    const isOpen = q ? true : openInst.has(provider); // 검색 중이면 강제로 펼침, 기본은 접힘
 
     const instCard = document.createElement('div');
     instCard.className = 'inst-card';
@@ -684,16 +730,20 @@ function renderProducts() {
       </div>
     `;
     instCard.querySelector('.inst-header').onclick = () => {
-      if (collapsedInst.has(provider)) collapsedInst.delete(provider); else collapsedInst.add(provider);
+      if (openInst.has(provider)) openInst.delete(provider); else openInst.add(provider);
       renderProducts();
     };
     wrap.appendChild(instCard);
 
     if (isOpen) {
       const subGrid = instCard.querySelector(`#grid-${cssId(provider)}`);
-      list.forEach(p => subGrid.appendChild(renderProductCard(p)));
+      matchedList.forEach(p => subGrid.appendChild(renderProductCard(p)));
     }
   });
+
+  if (!anyRendered) {
+    wrap.innerHTML = `<div class="empty">"${escapeHtml(q)}"에 대한 검색 결과가 없습니다.</div>`;
+  }
 }
 
 function cssId(s){ return String(s).replace(/[^a-zA-Z0-9가-힣]/g,'_'); }
@@ -761,7 +811,8 @@ function openPropose(product, available) {
   document.getElementById('modalAvailable').textContent = `현재 신청 가능 잔액: ${fmt(available)}억`;
   document.getElementById('mCorp').value = '';
   document.getElementById('mAmount').value = '';
-  document.getElementById('mHold').value = '60';
+  document.getElementById('mHoldValue').value = '1';
+  document.getElementById('mHoldUnit').value = '60';
   document.getElementById('modalErr').classList.remove('show');
   overlay.classList.add('show');
 }
@@ -771,12 +822,15 @@ overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('s
 document.getElementById('modalSubmit').onclick = async () => {
   const corp = document.getElementById('mCorp').value.trim();
   const amount = Number(document.getElementById('mAmount').value);
-  const holdMin = Number(document.getElementById('mHold').value);
+  const holdVal = Number(document.getElementById('mHoldValue').value);
+  const holdUnit = Number(document.getElementById('mHoldUnit').value);
+  const holdMin = Math.round(holdVal * holdUnit);
   const errBox = document.getElementById('modalErr');
   errBox.classList.remove('show');
 
   if (!corp) return showModalErr('고객법인명을 입력해주세요.');
   if (!amount || amount <= 0) return showModalErr('신청 금액을 입력해주세요.');
+  if (!holdVal || holdVal <= 0) return showModalErr('홀드 기간을 입력해주세요.');
 
   const { data, error } = await supabase.rpc('propose_allocation', {
     p_product_id: selectedProductId,
@@ -831,15 +885,11 @@ function renderMyAllocations() {
     `;
     const actions = tr.querySelector('.row-actions');
     if (a.status === 'proposed' && !expired) {
-      const okBtn = document.createElement('button');
-      okBtn.className = 'btn btn-sm btn-confirm';
-      okBtn.textContent = '확정처리';
-      okBtn.onclick = () => confirmAlloc(a.id);
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'btn btn-sm btn-danger';
       cancelBtn.textContent = '철회';
       cancelBtn.onclick = () => cancelAlloc(a.id);
-      actions.append(okBtn, cancelBtn);
+      actions.append(cancelBtn);
     }
     tbody.appendChild(tr);
   });
@@ -982,14 +1032,66 @@ document.getElementById('addProductBtn').onclick = async () => {
   await loadData();
 };
 
+let productMgmtSort = { key: 'created_at', dir: 'desc' };
+
+document.getElementById('productMgmtToggle').onclick = () => {
+  const body = document.getElementById('productMgmtBody');
+  const open = body.classList.toggle('open');
+  document.getElementById('productMgmtChevron').classList.toggle('open', open);
+};
+document.getElementById('productMgmtFilter').oninput = () => renderProductMgmt();
+
+document.querySelectorAll('#productMgmtTable th.sortable').forEach(th => {
+  th.dataset.label = th.textContent.trim();
+  th.onclick = () => {
+    const key = th.dataset.key;
+    if (productMgmtSort.key === key) productMgmtSort.dir = productMgmtSort.dir === 'asc' ? 'desc' : 'asc';
+    else productMgmtSort = { key, dir: 'asc' };
+    renderProductMgmt();
+  };
+});
+
+function updateSortArrows() {
+  document.querySelectorAll('#productMgmtTable th.sortable').forEach(th => {
+    const arrow = th.dataset.key === productMgmtSort.key ? (productMgmtSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    th.textContent = th.dataset.label + arrow;
+  });
+}
+
+function getSortVal(p, key) {
+  if (key === '_committed') { const { confirmed, hold } = balanceFor(p.id); return confirmed + hold; }
+  if (key === 'total_limit') return Number(p.total_limit);
+  return (p[key] || '').toString();
+}
+
 function renderProductMgmt() {
+  document.getElementById('productMgmtCount').textContent = products.length;
+  updateSortArrows();
   const tbody = document.getElementById('productMgmtTbody');
   tbody.innerHTML = '';
   if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#9aa0a6;">등록된 상품이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#9aa0a6;">등록된 상품이 없습니다.</td></tr>';
     return;
   }
-  products.forEach(p => {
+
+  const q = (document.getElementById('productMgmtFilter').value || '').trim().toLowerCase();
+  let rows = products.filter(p =>
+    !q || p.provider.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) ||
+    (p.tenor_label || '').toLowerCase().includes(q));
+
+  rows = [...rows].sort((a, b) => {
+    const va = getSortVal(a, productMgmtSort.key), vb = getSortVal(b, productMgmtSort.key);
+    if (va < vb) return productMgmtSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return productMgmtSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#9aa0a6;">"${escapeHtml(q)}" 검색 결과가 없습니다.</td></tr>`;
+    return;
+  }
+
+  rows.forEach(p => {
     const { confirmed, hold } = balanceFor(p.id);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -999,6 +1101,7 @@ function renderProductMgmt() {
       <td>${p.maturity || '—'}</td>
       <td class="amount">${fmt(p.total_limit)}</td>
       <td class="amount">${fmt(confirmed + hold)}</td>
+      <td class="countdown">${p.created_at ? new Date(p.created_at).toLocaleString('ko-KR') : '—'}</td>
       <td class="row-actions"></td>
     `;
     const editBtn = document.createElement('button');
@@ -1091,11 +1194,15 @@ function renderAllAllocations() {
       <td class="row-actions"></td>
     `;
     if (a.status === 'proposed' && !expired) {
+      const okBtn = document.createElement('button');
+      okBtn.className = 'btn btn-sm btn-confirm';
+      okBtn.textContent = '확정처리';
+      okBtn.onclick = () => confirmAlloc(a.id);
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'btn btn-sm btn-danger';
       cancelBtn.textContent = '강제취소';
       cancelBtn.onclick = () => cancelAlloc(a.id);
-      tr.querySelector('.row-actions').append(cancelBtn);
+      tr.querySelector('.row-actions').append(okBtn, cancelBtn);
     }
     if (a.status === 'confirmed') {
       const revertBtn = document.createElement('button');
@@ -1243,9 +1350,19 @@ setInterval(() => {
 function countdown(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
   if (diff <= 0) return '만료됨';
-  const m = Math.floor(diff/60000);
-  const s = Math.floor((diff%60000)/1000);
-  return `${m}분 ${s}초`;
+  const totalMin = Math.floor(diff / 60000);
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  const secs = Math.floor((diff % 60000) / 1000);
+  if (days >= 7) {
+    const weeks = Math.floor(days / 7);
+    const restDays = days % 7;
+    return restDays > 0 ? `${weeks}주 ${restDays}일` : `${weeks}주`;
+  }
+  if (days >= 1) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
+  if (hours >= 1) return `${hours}시간 ${mins}분`;
+  return `${mins}분 ${secs}초`;
 }
 
 // ---------- 유틸 ----------
