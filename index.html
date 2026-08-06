@@ -303,6 +303,9 @@
     .row-actions{white-space:nowrap;}
 
     .modal{max-width:100%; margin:0 10px;}
+    /* 키보드가 뜰 때 화면 리사이즈로 모달이 밀려서 탭이 씹히는 문제 방지: 정중앙 대신 위쪽 고정 + 자체 스크롤 */
+    .overlay{align-items:flex-start; overflow-y:auto; padding-top:32px; padding-bottom:32px;}
+    .modal .field input, .modal .field select{font-size:16px;} /* 16px 미만이면 일부 브라우저가 포커스시 확대/리플로우를 일으켜 탭이 씹힘 */
     #toasts{left:12px; right:12px; width:auto; top:auto; bottom:12px;}
   }
 
