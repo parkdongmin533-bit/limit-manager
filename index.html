@@ -1139,6 +1139,7 @@ document.getElementById('modalSubmit').onclick = async () => {
 function showModalErr(msg){
   const box = document.getElementById('modalErr');
   box.textContent = msg; box.classList.add('show');
+  alert('⚠ ' + msg); // 모바일에서 인라인 빨간 박스를 놓치는 경우가 많아 팝업으로도 확실히 띄움
 }
 
 // ---------- 내 신청내역 ----------
@@ -1477,6 +1478,7 @@ document.getElementById('editSubmit').onclick = async () => {
   if (!provider || !name || !limit) {
     errBox.textContent = '상품사 / 상품명 / 총한도를 입력해주세요.';
     errBox.classList.add('show');
+    alert('⚠ 상품사 / 상품명 / 총한도를 입력해주세요.');
     return;
   }
 
@@ -1490,8 +1492,10 @@ document.getElementById('editSubmit').onclick = async () => {
   });
 
   if (error) {
-    errBox.textContent = error.message.replace('ERROR:','').trim();
+    const msg = error.message.replace('ERROR:','').trim();
+    errBox.textContent = msg;
     errBox.classList.add('show');
+    alert('⚠ ' + msg);
     return;
   }
 
