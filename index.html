@@ -32,6 +32,11 @@
     --radius:10px;
   }
   *{box-sizing:border-box;}
+  html, body{
+    overflow-x:hidden; max-width:100%; width:100%;
+    /* 페이지 전체가 옆으로 새서 스크롤이 안 돌아오는 문제 원천 차단.
+       가로 스크롤은 오직 .table-scroll / .table-scroll-x 안에서만 허용 */
+  }
   body{
     margin:0; background:var(--paper); color:var(--ink);
     font-family:var(--sans); -webkit-font-smoothing:antialiased;
@@ -243,6 +248,30 @@
   #boardTable td, #boardTable th{white-space:nowrap;}
   #boardTable td.note-cell{font-size:12px; color:var(--ink-soft); min-width:260px;}
 
+  /* 모바일 전용 카드 뷰 (가로 스크롤 자체를 없애기 위한 대안 레이아웃) */
+  .board-cards{display:none;}
+  .board-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .board-card-head{display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;}
+  .board-card-head .name{font-size:15px; font-weight:700;}
+  .board-card-head .sector-tag{
+    font-family:var(--mono); font-size:10px; color:var(--ink-soft);
+    background:var(--paper); border:1px solid var(--line); border-radius:4px; padding:1px 6px;
+  }
+  .board-card-head .credit-tag{font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-soft); margin-left:auto;}
+  .board-card-row{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; border-bottom:1px dashed var(--line);}
+  .board-card-row:last-of-type{border-bottom:none;}
+  .board-card-row .k{color:var(--ink-soft);}
+  .board-card-row .v{font-family:var(--mono); font-weight:600;}
+  .board-card-total{
+    display:flex; justify-content:space-between; margin-top:8px; padding-top:8px;
+    border-top:1px solid var(--line); font-weight:700;
+  }
+  .board-card-total .v{font-family:var(--mono); font-size:16px; color:var(--accent);}
+  .board-card-note{margin-top:8px; font-size:11.5px; color:var(--ink-soft); line-height:1.5;}
+
   /* ---------- CSV 내보내기 ---------- */
   .export-row{display:flex; gap:10px; margin-bottom:16px;}
 
@@ -302,6 +331,10 @@
 
     main{padding:16px 12px 70px;}
     .section-title{margin:24px 0 10px;}
+
+    /* 현황판: 가로 스크롤 표 대신 카드 목록으로 전환 (스크롤 문제 원천 회피) */
+    #boardScrollBox{display:none;}
+    .board-cards{display:block;}
 
     .grid{grid-template-columns:1fr;} /* 카드 세로 1열 */
     .card{padding:16px 16px 14px;}
@@ -440,7 +473,7 @@
     <span class="mark">LIMIT</span>
     <h1>원리금보장상품 한도 관제</h1>
     <span class="sub" id="clock"></span>
-    <span class="build-tag">build 2026-08-06-21</span>
+    <span class="build-tag">build 2026-08-06-22</span>
   </div>
   <div class="header-right">
     <button class="admin-toggle" id="adminToggle">관리자 모드</button>
@@ -489,6 +522,7 @@
         <tbody id="boardTbody"></tbody>
       </table>
     </div>
+    <div id="boardCardsWrap" class="board-cards"></div>
   </div>
 
   <div class="section-title">
@@ -534,6 +568,7 @@
         </div>
         <textarea id="boardText" rows="8" placeholder="증권&#9;NH&#9;AA+&#9;3.2&#9;3.3&#9;3.4&#9;&#9;1.5년 3.46&#9;1500&#9;100&#9;&#9;700&#9;&#9;1년 1500억 1.5년 100억, 3년 700억"></textarea>
         <button class="btn btn-primary" style="width:auto; margin-top:10px;" id="boardReplaceBtn">게시판 전체 교체</button>
+        <button class="btn btn-sm btn-danger" style="margin-top:10px; margin-left:8px;" id="purgeBoardBtn">현황판 비우기</button>
       </div>
     </div>
 
@@ -567,6 +602,10 @@
       <thead><tr><th>이름</th><th>센터</th><th></th></tr></thead>
       <tbody id="rmMgmtTbody"></tbody>
     </table>
+    </div>
+    <div class="danger-zone">
+      <b>⚠ 위험 구역</b> — RM 명단 전체를 한 번에 삭제합니다. 되돌릴 수 없습니다 (과거 신청내역은 그대로 남습니다).
+      <button class="btn btn-sm btn-danger" style="margin-top:8px;" id="purgeAllRmBtn">전체 RM 삭제</button>
     </div>
 
     <div class="section-title"><h2>상품 등록</h2></div>
@@ -875,11 +914,13 @@ function renderBoard() {
   const asOfEl = document.getElementById('boardAsOf');
   const summaryEl = document.getElementById('boardSummary');
   const tbody = document.getElementById('boardTbody');
+  const cardsWrap = document.getElementById('boardCardsWrap');
 
   if (boardRows.length === 0) {
     asOfEl.textContent = '';
     summaryEl.innerHTML = '';
     tbody.innerHTML = '<tr><td colspan="15" style="color:#9aa0a6;">아직 등록된 현황판이 없습니다. 관리자 모드에서 엑셀 붙여넣기로 등록해주세요.</td></tr>';
+    cardsWrap.innerHTML = '<div class="empty">아직 등록된 현황판이 없습니다. 관리자 모드에서 엑셀 붙여넣기로 등록해주세요.</div>';
     return;
   }
 
@@ -916,6 +957,7 @@ function renderBoard() {
 
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="15" style="color:#9aa0a6;">"${escapeHtml(q)}" 검색 결과가 없습니다.</td></tr>`;
+    cardsWrap.innerHTML = `<div class="empty">"${escapeHtml(q)}" 검색 결과가 없습니다.</div>`;
     return;
   }
 
@@ -938,6 +980,36 @@ function renderBoard() {
       <td class="note-cell">${r.note ? escapeHtml(r.note) : ''}</td>
     </tr>
   `).join('');
+
+  // 모바일 카드 뷰 (가로 스크롤 없이 같은 정보를 전부 보여줌)
+  cardsWrap.innerHTML = rows.map(r => {
+    const rateBits = [
+      r.rate_1y != null ? `1년 ${r.rate_1y}` : '',
+      r.rate_2y != null ? `2년 ${r.rate_2y}` : '',
+      r.rate_3y != null ? `3년 ${r.rate_3y}` : '',
+      r.rate_5y != null ? `5년 ${r.rate_5y}` : '',
+      r.rate_other ? escapeHtml(r.rate_other) : ''
+    ].filter(Boolean).join(' · ');
+    const limitBits = [
+      r.limit_1y ? `1년 ${fmt(r.limit_1y)}` : '',
+      r.limit_1_5y ? `1.5년 ${fmt(r.limit_1_5y)}` : '',
+      r.limit_2y ? `2년 ${fmt(r.limit_2y)}` : '',
+      r.limit_3y ? `3년 ${fmt(r.limit_3y)}` : '',
+      r.limit_5y ? `5년 ${fmt(r.limit_5y)}` : ''
+    ].filter(Boolean).join(' · ');
+    return `
+    <div class="board-card">
+      <div class="board-card-head">
+        <span class="name">${escapeHtml(r.institution)}</span>
+        ${r.sector ? `<span class="sector-tag">${escapeHtml(r.sector)}</span>` : ''}
+        ${r.credit_rating ? `<span class="credit-tag">${escapeHtml(r.credit_rating)}</span>` : ''}
+      </div>
+      ${rateBits ? `<div class="board-card-row"><span class="k">금리(%)</span><span class="v">${rateBits}</span></div>` : ''}
+      ${limitBits ? `<div class="board-card-row"><span class="k">만기별 한도(억)</span><span class="v">${limitBits}</span></div>` : ''}
+      <div class="board-card-total"><span class="k">합계</span><span class="v">${fmt(boardRowTotal(r))}억</span></div>
+      ${r.note ? `<div class="board-card-note">${escapeHtml(r.note)}</div>` : ''}
+    </div>
+  `; }).join('');
 }
 
 document.getElementById('boardToggle').onclick = () => {
@@ -1613,6 +1685,26 @@ document.getElementById('purgeAllProductsBtn').onclick = async () => {
   if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
   await loadData();
   alert('전체 상품과 신청내역이 삭제되었습니다.');
+};
+
+document.getElementById('purgeAllRmBtn').onclick = async () => {
+  if (!confirm(`정말로 RM 명단 전체(${rmRoster.length}명)를 삭제하시겠습니까?\n이 작업은 절대 되돌릴 수 없습니다.`)) return;
+  const typed = prompt('진짜로 실행하려면 아래 칸에 정확히 "삭제" 라고 입력하세요.');
+  if (typed !== '삭제') { alert('입력이 일치하지 않아 취소되었습니다.'); return; }
+  const { error } = await supabase.rpc('admin_purge_all_rms');
+  if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
+  await loadData();
+  alert('RM 명단이 전부 삭제되었습니다.');
+};
+
+document.getElementById('purgeBoardBtn').onclick = async () => {
+  if (!confirm(`정말로 현황판 전체(${boardRows.length}개 기관)를 비우시겠습니까?\n이 작업은 절대 되돌릴 수 없습니다.`)) return;
+  const typed = prompt('진짜로 실행하려면 아래 칸에 정확히 "삭제" 라고 입력하세요.');
+  if (typed !== '삭제') { alert('입력이 일치하지 않아 취소되었습니다.'); return; }
+  const { error } = await supabase.rpc('admin_purge_board');
+  if (error) { alert(error.message.replace('ERROR:','').trim()); return; }
+  await loadData();
+  alert('현황판이 비워졌습니다.');
 };
 
 let allocSort = { key: 'created_at', dir: 'desc' };
