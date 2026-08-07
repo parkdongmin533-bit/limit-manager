@@ -473,7 +473,7 @@
     <span class="mark">LIMIT</span>
     <h1>원리금보장상품 한도 관제</h1>
     <span class="sub" id="clock"></span>
-    <span class="build-tag">build 2026-08-06-22</span>
+    <span class="build-tag">build 2026-08-06-23</span>
   </div>
   <div class="header-right">
     <button class="admin-toggle" id="adminToggle">관리자 모드</button>
@@ -1434,21 +1434,30 @@ document.getElementById('bulkProductAddBtn').onclick = async () => {
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) { alert('붙여넣은 내용이 없습니다.'); return; }
 
-  const rows = lines.map(line => {
+  const rows = [];
+  const skipped = []; // 형식이 안 맞아 건너뛴 줄 (이유 포함)
+  lines.forEach((line, idx) => {
     const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
     const [provider, name, tenor, maturity, limit, rate, credit] = parts.map(s => (s || '').trim());
-    return {
-      provider: provider || '',
-      name: name || '',
+    const limitNum = Number((limit || '').replace(/,/g, ''));
+    const reasons = [];
+    if (!provider) reasons.push('상품사 없음');
+    if (!name) reasons.push('상품명 없음');
+    if (!limit || isNaN(limitNum) || limitNum <= 0) reasons.push('총한도가 숫자가 아니거나 비어있음 (엑셀에서 이 줄만 칸이 하나 밀렸을 가능성이 큽니다)');
+
+    if (reasons.length > 0) {
+      skipped.push({ lineNo: idx + 1, text: line, reason: reasons.join(', ') });
+      return;
+    }
+    rows.push({
+      provider, name,
       tenor: tenor || null,
       maturity: /^\d{4}-\d{2}-\d{2}$/.test(maturity) ? maturity : null,
-      limit: Number(limit),
+      limit: limitNum,
       rate: rate && !isNaN(Number(rate)) ? Number(rate) : null,
       credit: credit || null
-    };
-  }).filter(r => r.provider && r.name && r.limit > 0);
-
-  if (rows.length === 0) { alert('형식을 인식하지 못했습니다. "상품사, 상품명, 만기구분, 만기일, 총한도, 금리, 신용등급" 순서를 확인해주세요.'); return; }
+    });
+  });
 
   btn.disabled = true; btn.textContent = '등록 중...';
   let ok = 0, fail = 0;
@@ -1461,9 +1470,18 @@ document.getElementById('bulkProductAddBtn').onclick = async () => {
   }
   btn.disabled = false; btn.textContent = '일괄 등록';
 
-  document.getElementById('bulkProductText').value = '';
+  // 문제 있던 줄만 입력창에 남겨서, 엑셀 고치고 다시 붙여넣기 쉽게 함
+  document.getElementById('bulkProductText').value = skipped.map(s => s.text).join('\n');
   await loadData();
-  alert(`${ok}건 등록 완료.` + (fail > 0 ? `\n${fail}건 실패` : ''));
+
+  let msg = `${ok}건 등록 완료.`;
+  if (fail > 0) msg += `\n${fail}건은 서버 오류로 실패했습니다.`;
+  if (skipped.length > 0) {
+    msg += `\n\n⚠ ${skipped.length}줄은 형식이 안 맞아 건너뛰었습니다 (아래 입력창에 그대로 남겨뒀습니다):\n`;
+    msg += skipped.slice(0, 10).map(s => `${s.lineNo}번째 줄 — ${s.reason}`).join('\n');
+    if (skipped.length > 10) msg += `\n...외 ${skipped.length - 10}줄`;
+  }
+  alert(msg);
 };
 
 document.getElementById('addProductBtn').onclick = async () => {
